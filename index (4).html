@@ -1,0 +1,789 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Plate Log</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#2F5D3A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Plate Log">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%232F5D3A'/%3E%3Ctext x='32' y='43' font-size='30' text-anchor='middle' fill='%23F2B925'%3E%E2%98%85%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: sticky header + filter bar over a photo-first card grid; entry form and detail open as a side sheet (full screen on phones). */
+:root{
+  --bg:#F6F7F2; --surface:#FFFFFF; --sunk:#ECEEE5; --fg:#1D2118; --muted:#646B5A; --line:#DADDD0;
+  --accent:#2F5D3A; --accent-fg:#FFFFFF; --star:#E2A208; --star-off:#D3D6C8; --danger:#B3261E;
+  --shadow:0 1px 2px rgba(29,33,24,.06),0 8px 24px rgba(29,33,24,.08);
+  --display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
+  --body:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#13160F; --surface:#1C2017; --sunk:#252A1F; --fg:#ECEFE4; --muted:#A2A894; --line:#333A2B;
+  --accent:#8CC79A; --accent-fg:#10200F; --star:#F2B925; --star-off:#3C4334; --danger:#F2867D;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#13160F; --surface:#1C2017; --sunk:#252A1F; --fg:#ECEFE4; --muted:#A2A894; --line:#333A2B;
+  --accent:#8CC79A; --accent-fg:#10200F; --star:#F2B925; --star-off:#3C4334; --danger:#F2867D;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35); color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.5}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+.bar{display:flex;align-items:center;gap:12px;padding-block:14px;flex-wrap:wrap}
+h1{font-family:var(--display);font-weight:800;font-size:28px;letter-spacing:-.02em;margin:0;line-height:1}
+h1 small{display:block;font-family:var(--body);font-weight:500;font-size:12px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-top:6px}
+.spacer{flex:1}
+.btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:9px 14px;font-weight:600;font-size:14px}
+.btn.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.btn.ghost{background:transparent}
+.btn.danger{color:var(--danger)}
+.btn:disabled{opacity:.5;cursor:default}
+
+.stats{display:flex;gap:28px;padding-block:18px 6px;flex-wrap:wrap}
+.stat b{display:block;font-family:var(--display);font-size:26px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
+.stat span{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+
+.filters{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;padding-block:14px}
+.filters .search{grid-column:span 2}
+.filters input,.filters select{width:100%;min-width:0;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:9px 10px;font-size:14px}
+.filters select.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.ftoggle{display:none}
+@media (max-width:520px){
+  .filters{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .filters .search{grid-column:1/2}
+  .ftoggle{display:inline-flex;justify-content:center}
+  .filters.collapsed select{display:none}
+}
+.views{max-width:460px;margin-top:6px}
+/* rankings */
+.rankbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-block:6px 4px}
+.rankbar label{font-size:13.5px;color:var(--muted);display:flex;align-items:center;gap:8px}
+.rankbar select{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 10px;font-size:14px}
+.rankbar .hint{margin-left:auto}
+.rgroup{padding-block:14px 6px}
+.rgroup h3{font-family:var(--display);font-size:20px;margin:0 0 10px;display:flex;align-items:baseline;gap:10px}
+.rgroup h3 span{font-family:var(--body);font-size:13px;font-weight:500;color:var(--muted)}
+.rlist{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--surface)}
+.rrow{display:grid;grid-template-columns:44px 56px minmax(0,1fr) auto;align-items:center;gap:12px;padding:10px 14px;border:0;border-top:1px solid var(--line);background:transparent;text-align:left;width:100%}
+.rrow:first-child{border-top:0}
+.rrow:hover{background:var(--sunk)}
+.rk{font-family:var(--display);font-weight:800;font-size:22px;color:var(--muted);text-align:center;font-variant-numeric:tabular-nums}
+.rk.top{color:var(--accent)}
+.rthumb{width:56px;height:56px;border-radius:10px;overflow:hidden;background:var(--sunk);display:grid;place-items:center;color:var(--muted);font-size:20px}
+.rthumb img{width:100%;height:100%;object-fit:cover}
+.rmain{min-width:0;display:flex;flex-direction:column;gap:2px}
+.rmain b{font-size:15.5px;overflow-wrap:anywhere}
+.rmain span{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.rscore{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+.rscore .num{font-size:15px}
+@media (max-width:480px){.rrow{grid-template-columns:30px 48px minmax(0,1fr);gap:10px}.rthumb{width:48px;height:48px}.rscore{grid-column:3;align-items:flex-start;flex-direction:row;gap:8px}.rk{font-size:18px}}
+.activechips{display:flex;gap:6px;flex-wrap:wrap;padding-bottom:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--sunk);border-radius:999px;padding:3px 10px;font-size:12.5px;font-weight:500}
+button.chip:hover{border-color:var(--accent)}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:18px;padding-block:10px 60px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;text-align:left;padding:0;display:flex;flex-direction:column;transition:transform .15s,box-shadow .15s}
+.card:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+.thumb{aspect-ratio:4/3;width:100%;max-width:100%;background:var(--sunk);position:relative;display:grid;place-items:center;color:var(--muted);font-size:13px}
+.thumb{overflow:hidden;min-height:0}
+.thumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.thumb .count{position:absolute;right:8px;bottom:8px;background:rgba(0,0,0,.6);color:#fff;border-radius:6px;padding:1px 7px;font-size:12px}
+.card .body{padding:12px 14px 14px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.card .dish{font-family:var(--display);font-weight:700;font-size:18px;line-height:1.2;margin:0;overflow-wrap:anywhere}
+.card .where{color:var(--muted);font-size:13.5px;overflow-wrap:anywhere}
+.card .row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px}
+.card .tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+.num{font-variant-numeric:tabular-nums;font-weight:600;font-size:13px}
+
+/* stars */
+.stars{display:inline-flex;gap:1px;line-height:1}
+.st{position:relative;display:inline-block;color:var(--star-off)}
+.st .fill{position:absolute;inset:0 auto 0 0;overflow:hidden;color:var(--star);white-space:nowrap}
+.stars.sm{font-size:16px}.stars.md{font-size:22px}.stars.lg{font-size:30px}
+.picker{display:inline-flex;align-items:center;gap:10px}
+.picker .stars{font-size:30px}
+.picker .st{cursor:pointer}
+.picker .half{position:absolute;top:0;bottom:0;width:50%;border:0;background:transparent;padding:0;z-index:1}
+.picker .half.l{left:0}.picker .half.r{right:0}
+.picker .val{font-variant-numeric:tabular-nums;font-weight:600;min-width:2.6em;color:var(--muted)}
+.picker.small .stars{font-size:22px}
+.clear{border:0;background:none;color:var(--muted);font-size:12.5px;text-decoration:underline;padding:0}
+
+/* sheet */
+.scrim{position:fixed;inset:0;background:rgba(10,12,8,.45);z-index:20}
+.sheet{position:fixed;top:0;right:0;bottom:0;width:min(560px,100%);background:var(--bg);z-index:21;display:flex;flex-direction:column;box-shadow:var(--shadow);
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);padding-right:env(safe-area-inset-right,0px)}
+.sheet header{display:flex;align-items:center;gap:10px;padding:14px 20px;border-bottom:1px solid var(--line)}
+.sheet header h2{font-family:var(--display);font-size:22px;margin:0;flex:1;min-width:0}
+.sheet .scroll{overflow:auto;padding:20px;flex:1}
+.sheet footer{display:flex;gap:8px;padding:12px 20px;border-top:1px solid var(--line);flex-wrap:wrap}
+.x{border:0;background:var(--sunk);width:34px;height:34px;border-radius:9px;font-size:18px;line-height:1}
+
+form{display:flex;flex-direction:column;gap:18px}
+fieldset{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+legend{font-size:12px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;padding:0}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:480px){.f2{grid-template-columns:1fr}}
+label.fl{display:flex;flex-direction:column;gap:5px;font-size:13.5px;font-weight:500;min-width:0}
+label.fl input,label.fl select,label.fl textarea{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 11px;width:100%;min-width:0}
+textarea{resize:vertical;min-height:96px}
+.req{color:var(--danger)}
+.subgrid{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;align-items:center}
+.subgrid span{font-size:14px}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
+.seg button{flex:1;border:0;background:transparent;padding:9px 6px;font-size:14px;font-weight:500}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg)}
+.seg button+button{border-left:1px solid var(--line)}
+
+.photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
+.ph{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:var(--sunk);max-width:100%}
+.ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.ph .rm{position:absolute;top:4px;right:4px;border:0;background:rgba(0,0,0,.65);color:#fff;width:24px;height:24px;border-radius:6px;font-size:14px;line-height:1}
+.ph.busy{display:grid;place-items:center;font-size:12px;color:var(--muted)}
+.drop{aspect-ratio:1;border:1.5px dashed var(--line);border-radius:10px;display:grid;place-items:center;text-align:center;font-size:12.5px;color:var(--muted);background:var(--surface);cursor:pointer;padding:6px}
+.drop.over{border-color:var(--accent);color:var(--accent)}
+.hint{font-size:12.5px;color:var(--muted)}
+.err{color:var(--danger);font-size:13.5px}
+
+/* detail */
+.gallery{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;margin:0 -20px 16px;padding:0 20px}
+.gallery img{height:280px;max-width:88%;object-fit:cover;border-radius:12px;scroll-snap-align:start;flex:none}
+.dl{display:grid;grid-template-columns:auto 1fr;gap:8px 18px;margin:16px 0;font-size:14px}
+.dl dt{color:var(--muted)}.dl dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.comment{white-space:pre-wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;margin:0}
+.bigscore{display:flex;align-items:center;gap:12px;margin:4px 0 6px}
+.bigscore b{font-family:var(--display);font-size:34px;font-variant-numeric:tabular-nums}
+
+.empty{text-align:center;padding:70px 16px;color:var(--muted);max-width:440px;margin:0 auto}
+.empty h3{font-family:var(--display);font-size:24px;color:var(--fg);margin:0 0 8px}
+.empty .plate{width:96px;height:96px;margin:0 auto 18px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-size:30px;color:var(--star);background:var(--surface)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:9px 16px;border-radius:10px;font-size:14px;z-index:40}
+@media (prefers-reduced-motion:reduce){.card{transition:none}.card:hover{transform:none}}
+</style>
+<style>
+html{color-scheme:light}
+@media (prefers-color-scheme:dark){html{color-scheme:dark}}
+body{margin:0;font-size:15px;padding-bottom:env(safe-area-inset-bottom,0px)}
+img{max-width:100%}
+[hidden]{display:none!important}
+.login{max-width:380px;margin:12vh auto 0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.login h1{font-size:40px;margin-bottom:6px}
+.login p{color:var(--muted);margin:0 0 24px}
+.login form{gap:14px}
+.login .btn{justify-content:center;padding:12px}
+.menu{position:relative}
+.menu-pop{position:absolute;right:0;top:calc(100% + 6px);background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px;min-width:190px;z-index:8;display:flex;flex-direction:column}
+.menu-pop button{border:0;background:none;text-align:left;padding:9px 12px;border-radius:8px;font-size:14px}
+.menu-pop button:hover{background:var(--sunk)}
+.menu-pop .who{font-size:12px;color:var(--muted);padding:6px 12px 8px;border-bottom:1px solid var(--line);margin-bottom:4px;overflow-wrap:anywhere}
+</style>
+</head>
+<body>
+
+<!-- Setup / login screen -->
+<section class="login" id="loginView" hidden>
+  <h1>Plate Log</h1>
+  <p id="loginMsg">Sign in to open your food journal.</p>
+  <form id="loginForm">
+    <label class="fl">Email<input id="lEmail" type="email" autocomplete="username" required></label>
+    <label class="fl">Password<input id="lPass" type="password" autocomplete="current-password" required></label>
+    <p class="err" id="loginErr" hidden></p>
+    <button class="btn primary" id="loginBtn" type="submit">Sign in</button>
+  </form>
+</section>
+
+<div id="appView" hidden>
+<header class="top">
+  <div class="wrap bar">
+    <h1>Plate Log<small>Private food journal</small></h1>
+    <div class="spacer"></div>
+    <button class="btn primary" id="addBtn">+ Log a meal</button>
+    <div class="menu">
+      <button class="btn ghost" id="menuBtn" aria-haspopup="true" aria-expanded="false" aria-label="More">⋯</button>
+      <div class="menu-pop" id="menuPop" hidden>
+        <div class="who" id="whoAmI"></div>
+        <button id="exportBtn">Export to spreadsheet (CSV)</button>
+        <button id="signOutBtn">Sign out</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="stats" id="stats" hidden>
+    <div class="stat"><b id="sCount">0</b><span>Meals logged</span></div>
+    <div class="stat"><b id="sAvg">–</b><span>Avg rating</span></div>
+    <div class="stat"><b id="sRest">0</b><span>Restaurants</span></div>
+    <div class="stat"><b id="sTop">–</b><span>Top cuisine</span></div>
+  </section>
+
+  <div class="seg views" id="views" hidden>
+    <button type="button" data-v="gallery">Gallery</button>
+    <button type="button" data-v="meals">Top meals</button>
+    <button type="button" data-v="restaurants">Top restaurants</button>
+  </div>
+
+  <section class="filters collapsed" id="filters" hidden>
+    <input class="search" id="q" type="search" placeholder="Search dish, pasta, city…" aria-label="Search">
+    <button type="button" class="btn ftoggle" id="fToggle" aria-expanded="false">Filters</button>
+    <select id="fType" aria-label="Dish type"></select>
+    <select id="fCuisine" aria-label="Cuisine"></select>
+    <select id="fRest" aria-label="Restaurant"></select>
+    <select id="fCity" aria-label="City"></select>
+    <select id="fCountry" aria-label="Country"></select>
+    <select id="fStyle" aria-label="Dining style"></select>
+    <select id="fMeal" aria-label="Meal"></select>
+    <select id="fPrice" aria-label="Price"></select>
+    <select id="fMin" aria-label="Minimum rating">
+      <option value="0">Any rating</option><option value="4.5">4.5★ and up</option><option value="4">4★ and up</option><option value="3">3★ and up</option><option value="2">2★ and up</option>
+    </select>
+    <select id="sort" aria-label="Sort">
+      <option value="date-desc">Newest visit</option><option value="date-asc">Oldest visit</option>
+      <option value="rating-desc">Highest rated</option><option value="rating-asc">Lowest rated</option>
+      <option value="rest-asc">Restaurant A–Z</option><option value="value-desc">Best value</option>
+    </select>
+  </section>
+  <div class="activechips" id="chips"></div>
+
+  <section id="grid" class="grid" aria-live="polite"></section>
+  <section id="rankView" hidden>
+    <div class="rankbar">
+      <label for="groupBy">Rank within</label>
+      <select id="groupBy">
+        <option value="">Everything (overall)</option>
+        <option value="dishType">Each dish type</option>
+        <option value="cuisine">Each cuisine</option>
+        <option value="city">Each city</option>
+        <option value="country">Each country</option>
+        <option value="style">Each dining style</option>
+        <option value="restaurant">Each restaurant</option>
+      </select>
+      <span class="hint" id="rankHint"></span>
+    </div>
+    <div id="rankBody" style="padding-bottom:60px"></div>
+  </section>
+  <section id="emptyState" class="empty">
+    <div class="plate">★</div>
+    <h3 id="emptyTitle">Loading your log…</h3>
+    <p id="emptyText">Your meals appear here.</p>
+  </section>
+</main>
+</div>
+
+<div class="scrim" id="scrim" hidden></div>
+<aside class="sheet" id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+  <header><h2 id="sheetTitle">Log a meal</h2><button class="x" id="closeSheet" aria-label="Close">×</button></header>
+  <div class="scroll" id="sheetBody"></div>
+  <footer id="sheetFoot"></footer>
+</aside>
+<div class="toast" id="toast" hidden></div>
+<input type="file" id="fileIn" accept="image/*" multiple hidden>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.97.0"></script>
+<script>
+/* ============================================================
+   STEP 4 OF THE SETUP GUIDE: paste your two Supabase values here.
+   Find them in Supabase → Project Settings → API Keys / Data API.
+   The publishable (or "anon") key is meant to be public; your
+   data is protected by the sign-in and the database rules.
+   ============================================================ */
+const SUPABASE_URL = "https://dawpwxxccjnzfjscpkcl.supabase.co";      // looks like https://abcdefgh.supabase.co
+const SUPABASE_KEY = "sb_publishable_Z1R8jB_n6AWrqwqIPwxhTg_VkLDZuCm";  // starts with sb_publishable_ (or eyJ... for the legacy anon key)
+/* ============================================================ */
+
+(() => {
+const MEALS=["Breakfast","Brunch","Lunch","Dinner","Dessert","Snack","Drinks","Late night"];
+const SUBS=[["taste","Taste"],["presentation","Presentation"],["portion","Portion size"],["value","Value for money"],["service","Service"],["atmosphere","Atmosphere"]];
+const PRICE=["$","$$","$$$","$$$$"];
+const RET={yes:"Yes",maybe:"Maybe",no:"No"};
+const BUCKET="photos";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+let sb=null, uid=null, entries=[];
+const urlCache=new Map(); // storage path -> signed URL
+const fixedUrl=new Map(); // storage path -> local converted URL (HEIC repairs)
+const imgUrl=p=>fixedUrl.get(p)||urlCache.get(p)||"data:,";
+const imgTag=(p,alt="",lazy=false)=>`<img src="${esc(imgUrl(p))}" data-path="${esc(p)}" alt="${esc(alt)}"${lazy?' loading="lazy"':""}>`;
+/* HEIC support: Chrome/Firefox can't show iPhone HEIC photos, so convert them in the browser */
+let heicLib=null;
+function loadHeic(){
+  if(window.heic2any) return Promise.resolve(window.heic2any);
+  if(!heicLib) heicLib=new Promise((res,rej)=>{const sc=document.createElement("script");sc.src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js";sc.onload=()=>res(window.heic2any);sc.onerror=()=>{heicLib=null;rej(new Error("Couldn't load the HEIC converter"));};document.head.appendChild(sc);});
+  return heicLib;
+}
+async function toJpeg(blob){const h=await loadHeic();let out=await h({blob,toType:"image/jpeg",quality:.85});return Array.isArray(out)?out[0]:out;}
+const repairing=new Set(); let photoErrShown=false;
+async function repairPhoto(img){
+  const path=img.dataset.path; if(!path||img.dataset.tried) return; img.dataset.tried="1";
+  if(fixedUrl.has(path)){img.src=fixedUrl.get(path);return;}
+  if(repairing.has(path)) return; repairing.add(path);
+  try{
+    const {data,error}=await sb.storage.from(BUCKET).download(path); if(error) throw error;
+    let blob=data;
+    try{ await createImageBitmap(blob); }catch(_){ blob=await toJpeg(blob); }
+    const u=URL.createObjectURL(blob); fixedUrl.set(path,u);
+    document.querySelectorAll("img[data-path]").forEach(i=>{if(i.dataset.path===path) i.src=u;});
+  }catch(e){
+    console.warn("Photo failed to load",path,e);
+    if(!photoErrShown){photoErrShown=true;toast("A photo couldn't be loaded: "+(e.message||e));}
+  }finally{repairing.delete(path);}
+}
+document.addEventListener("error",ev=>{const t=ev.target;if(t&&t.tagName==="IMG"&&t.dataset&&t.dataset.path) repairPhoto(t);},true);
+const STYLES=["Sit-down","Takeout","Fast food"];
+const filt={q:"",type:"",cuisine:"",rest:"",city:"",country:"",style:"",meal:"",price:"",min:0,sort:"date-desc",tag:""};
+let view="gallery", groupBy="";
+try{const s=JSON.parse(localStorage.getItem("plate-filters")||"null"); if(s){ if(s.sort)filt.sort=s.sort; if(s.view)view=s.view; if(s.groupBy!=null)groupBy=s.groupBy; }}catch(e){}
+function savePrefs(){try{localStorage.setItem("plate-filters",JSON.stringify({sort:filt.sort,view,groupBy}));}catch(_){}}
+const DISH_TYPES=["Pasta","Pizza","Burger","Sandwich","Sushi","Ramen","Noodles","Tacos","Curry","Steak","Chicken","Seafood","BBQ","Salad","Soup","Rice bowl","Dumplings","Breakfast plate","Dessert","Pastry","Coffee","Cocktail"];
+const COUNTRIES=["Canada","United States","Mexico","Italy","France","Spain","Portugal","United Kingdom","Japan","South Korea","Thailand","Vietnam","China","India"];
+const cityOf=e=>(e.city||e.location||"").trim();
+
+function toast(msg){const t=$("toast");t.textContent=msg;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,2800);}
+function starsHTML(v,size="sm"){
+  let h=`<span class="stars ${size}" role="img" aria-label="${v||0} out of 5 stars">`;
+  for(let i=1;i<=5;i++){const f=Math.max(0,Math.min(1,(v||0)-(i-1)));h+=`<span class="st">★<span class="fill" style="width:${f*100}%">★</span></span>`;}
+  return h+"</span>";
+}
+const fmtR=v=>v?(+v).toFixed(1):"–";
+function fmtDate(d){if(!d)return"";const [y,m,dd]=d.split("-").map(Number);return new Date(y,m-1,dd).toLocaleDateString(undefined,{year:"numeric",month:"short",day:"numeric"});}
+
+/* ---------- boot & auth ---------- */
+function showLogin(msg,isErr){
+  $("appView").hidden=true; $("loginView").hidden=false;
+  if(msg){ $("loginMsg").textContent=msg; $("loginMsg").style.color=isErr?"var(--danger)":""; }
+}
+async function boot(){
+  if(SUPABASE_URL.startsWith("PASTE")||SUPABASE_KEY.startsWith("PASTE")){
+    showLogin("Setup needed: open index.html and paste your Supabase project URL and publishable key near the bottom of the file (step 4 of the guide).",true);
+    $("loginForm").hidden=true; return;
+  }
+  if(!window.supabase){showLogin("Couldn't load the Supabase library. Check your internet connection and reload.",true);$("loginForm").hidden=true;return;}
+  sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true}});
+  const {data:{session}}=await sb.auth.getSession();
+  if(session) startApp(session); else showLogin();
+  sb.auth.onAuthStateChange((ev,s)=>{ if(ev==="SIGNED_OUT"){uid=null;entries=[];urlCache.clear();showLogin("Signed out.");} });
+}
+$("loginForm").onsubmit=async ev=>{
+  ev.preventDefault();
+  const err=$("loginErr"); err.hidden=true; $("loginBtn").disabled=true;
+  const {data,error}=await sb.auth.signInWithPassword({email:$("lEmail").value.trim(),password:$("lPass").value});
+  $("loginBtn").disabled=false;
+  if(error){err.textContent=error.message==="Invalid login credentials"?"That email and password don't match. Check both and try again.":error.message;err.hidden=false;return;}
+  $("lPass").value=""; startApp(data.session);
+};
+async function startApp(session){
+  uid=session.user.id;
+  $("whoAmI").textContent=session.user.email||"";
+  $("loginView").hidden=true; $("appView").hidden=false;
+  await loadEntries();
+}
+async function loadEntries(){
+  const {data,error}=await sb.from("meals").select("id,data,created_at").order("created_at",{ascending:false});
+  if(error){ $("emptyTitle").textContent="Couldn't load your log"; $("emptyText").textContent=error.message+" — check that you ran setup.sql (step 3)."; $("emptyState").hidden=false; return; }
+  entries=data.map(r=>({...r.data,id:r.id}));
+  await signPhotos(entries.flatMap(e=>e.photos||[]));
+  render();
+}
+async function signPhotos(paths){
+  const need=[...new Set(paths)].filter(p=>!urlCache.has(p));
+  for(let i=0;i<need.length;i+=100){
+    const {data,error}=await sb.storage.from(BUCKET).createSignedUrls(need.slice(i,i+100),60*60*12);
+    if(!error&&data) data.forEach(d=>{ if(d.signedUrl) urlCache.set(d.path,d.signedUrl); });
+  }
+}
+
+/* ---------- list ---------- */
+function uniq(key){const m=new Map();entries.forEach(e=>{const v=(key==="city"?cityOf(e):(e[key]||"")).trim();if(v)m.set(v.toLowerCase(),v);});return [...m.values()].sort((a,b)=>a.localeCompare(b));}
+function fillSelect(el,label,vals,cur){el.innerHTML=`<option value="">${label}</option>`+vals.map(v=>`<option value="${esc(v)}"${v===cur?" selected":""}>${esc(v)}</option>`).join("");}
+
+const same=(a,b)=>(a||"").trim().toLowerCase()===(b||"").trim().toLowerCase();
+function matches(e){
+  if(filt.type&&!same(e.dishType,filt.type))return false;
+  if(filt.cuisine&&!same(e.cuisine,filt.cuisine))return false;
+  if(filt.rest&&!same(e.restaurant,filt.rest))return false;
+  if(filt.city&&!same(cityOf(e),filt.city))return false;
+  if(filt.country&&!same(e.country,filt.country))return false;
+  if(filt.style&&e.style!==filt.style)return false;
+  if(filt.meal&&e.meal!==filt.meal)return false;
+  if(filt.price&&String(e.price)!==filt.price)return false;
+  if(filt.min&&(e.overall||0)<filt.min)return false;
+  if(filt.tag&&!(e.tags||[]).some(t=>same(t,filt.tag)))return false;
+  const q=filt.q.toLowerCase();
+  if(q){const hay=[e.dish,e.dishType,e.restaurant,e.cuisine,cityOf(e),e.country,e.area,e.style,e.meal,e.comments,(e.tags||[]).join(" ")].join(" ").toLowerCase();if(!hay.includes(q))return false;}
+  return true;
+}
+
+function render(){
+  const has=entries.length>0;
+  $("stats").hidden=!has; $("filters").hidden=!has; $("views").hidden=!has;
+  fillSelect($("fType"),"All dish types",uniq("dishType"),filt.type);
+  fillSelect($("fCuisine"),"All cuisines",uniq("cuisine"),filt.cuisine);
+  fillSelect($("fRest"),"All restaurants",uniq("restaurant"),filt.rest);
+  fillSelect($("fCity"),"All cities",uniq("city"),filt.city);
+  fillSelect($("fCountry"),"All countries",uniq("country"),filt.country);
+  fillSelect($("fStyle"),"All dining styles",STYLES.filter(x=>entries.some(e=>e.style===x)),filt.style);
+  fillSelect($("fMeal"),"All meals",MEALS.filter(m=>entries.some(e=>e.meal===m)),filt.meal);
+  $("fPrice").innerHTML=`<option value="">Any price</option>`+PRICE.map((p,i)=>`<option value="${i+1}"${String(i+1)===filt.price?" selected":""}>${p}</option>`).join("");
+  $("fMin").value=String(filt.min); $("sort").value=filt.sort; $("groupBy").value=groupBy;
+  [["fType","type"],["fCuisine","cuisine"],["fRest","rest"],["fCity","city"],["fCountry","country"],["fStyle","style"],["fMeal","meal"],["fPrice","price"]].forEach(([id,k])=>$(id).classList.toggle("on",!!filt[k]));
+  $("fMin").classList.toggle("on",!!filt.min);
+  const nOn=["type","cuisine","rest","city","country","style","meal","price","min"].filter(k=>filt[k]).length;
+  $("fToggle").textContent=nOn?`Filters (${nOn})`:"Filters";
+  $("views").querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v===view)));
+  $("sort").hidden=view!=="gallery";
+  $("groupBy").querySelector('option[value="restaurant"]').hidden=view==="restaurants";
+  if(view==="restaurants"&&groupBy==="restaurant"){groupBy="";$("groupBy").value="";}
+
+  const rated=entries.filter(e=>e.overall);
+  $("sCount").textContent=entries.length;
+  $("sAvg").textContent=rated.length?(rated.reduce((a,e)=>a+e.overall,0)/rated.length).toFixed(2):"–";
+  $("sRest").textContent=uniq("restaurant").length;
+  const cc={};entries.forEach(e=>{if(e.cuisine)cc[e.cuisine]=(cc[e.cuisine]||0)+1;});
+  $("sTop").textContent=Object.entries(cc).sort((a,b)=>b[1]-a[1])[0]?.[0]||"–";
+
+  let list=entries.filter(matches);
+  const [k,dir]=filt.sort.split("-"),s=dir==="asc"?1:-1;
+  list.sort((a,b)=>{
+    if(k==="date")return s*((a.date||"").localeCompare(b.date||""))||s*((a.createdAt||0)-(b.createdAt||0));
+    if(k==="rating")return s*((a.overall||0)-(b.overall||0))||(b.date||"").localeCompare(a.date||"");
+    if(k==="value")return s*((a.ratings?.value||0)-(b.ratings?.value||0))||(b.overall||0)-(a.overall||0);
+    return (a.restaurant||"").localeCompare(b.restaurant||"")||(b.date||"").localeCompare(a.date||"");
+  });
+
+  const act=[];
+  if(filt.tag)act.push(["tag","Tag: "+filt.tag]);
+  if(filt.type)act.push(["type",filt.type]); if(filt.city)act.push(["city",filt.city]); if(filt.country)act.push(["country",filt.country]);
+  if(filt.cuisine)act.push(["cuisine",filt.cuisine]); if(filt.rest)act.push(["rest",filt.rest]);
+  if(filt.style)act.push(["style",filt.style]); if(filt.meal)act.push(["meal",filt.meal]); if(filt.price)act.push(["price",PRICE[filt.price-1]]);
+  if(filt.min)act.push(["min",filt.min+"★+"]); if(filt.q)act.push(["q","“"+filt.q+"”"]);
+  $("chips").innerHTML=act.length?act.map(([k,l])=>`<button class="chip" data-clear="${k}">${esc(l)} ×</button>`).join("")+`<span class="hint" style="align-self:center">${list.length} of ${entries.length}</span>`:"";
+
+  const gallery=view==="gallery";
+  $("grid").hidden=!gallery||!list.length; $("rankView").hidden=gallery||!list.length;
+  if(gallery) $("grid").innerHTML=list.map(cardHTML).join("");
+  else renderRankings(list);
+  const es=$("emptyState");
+  if(!has){es.hidden=false;$("emptyTitle").textContent="Your first plate goes here";$("emptyText").innerHTML="Tap <b>+ Log a meal</b> to add a photo, the restaurant, the date you went, a half-star rating and your notes.";}
+  else if(!list.length){es.hidden=false;$("emptyTitle").textContent="Nothing matches";$("emptyText").textContent="Try clearing a filter above.";}
+  else es.hidden=true;
+}
+
+/* ---------- rankings ---------- */
+const GROUP_LABEL={dishType:"dish type",cuisine:"cuisine",city:"city",country:"country",style:"dining style",restaurant:"restaurant"};
+function groupVal(e,g){return g==="city"?cityOf(e):g==="restaurant"?(e.restaurant||""):(e[g]||"");}
+function makeGroups(list){
+  if(!groupBy) return [["",list]];
+  const m=new Map();
+  list.forEach(e=>{const v=groupVal(e,groupBy).trim();const k=v.toLowerCase();if(!m.has(k))m.set(k,[v,[]]);m.get(k)[1].push(e);});
+  return [...m.values()].sort((a,b)=>!a[0]?1:!b[0]?-1:a[0].localeCompare(b[0]));
+}
+// competition ranking: equal scores share a rank (1, 2, 2, 4)
+function withRanks(arr,score){let prev=null,r=0;return arr.map((x,i)=>{const s=Math.round(score(x)*100);if(s!==prev){r=i+1;prev=s;}return [r,x];});}
+function rankMeals(list){
+  return withRanks(list.slice().sort((a,b)=>(b.overall||0)-(a.overall||0)||(b.ratings?.taste||0)-(a.ratings?.taste||0)||(b.date||"").localeCompare(a.date||"")),e=>e.overall||0);
+}
+function rankRestaurants(list){
+  const m=new Map();
+  list.forEach(e=>{
+    const k=(e.restaurant||"").trim().toLowerCase()+"|"+cityOf(e).toLowerCase();
+    let r=m.get(k); if(!r){r={name:e.restaurant||"Untitled",city:cityOf(e),country:e.country||"",meals:[],cz:{}};m.set(k,r);}
+    r.meals.push(e); if(e.cuisine)r.cz[e.cuisine]=(r.cz[e.cuisine]||0)+1; if(!r.country&&e.country)r.country=e.country;
+  });
+  const rs=[...m.values()].map(r=>{
+    const rated=r.meals.filter(x=>x.overall);
+    r.avg=rated.length?rated.reduce((a,x)=>a+x.overall,0)/rated.length:0;
+    r.best=r.meals.slice().sort((a,b)=>(b.overall||0)-(a.overall||0))[0];
+    r.cuisine=Object.entries(r.cz).sort((a,b)=>b[1]-a[1])[0]?.[0]||"";
+    r.photo=(r.meals.find(x=>(x.photos||[]).length)||{photos:[]}).photos[0];
+    return r;
+  });
+  rs.sort((a,b)=>b.avg-a.avg||b.meals.length-a.meals.length||a.name.localeCompare(b.name));
+  return withRanks(rs,r=>r.avg);
+}
+function thumb(p){return `<span class="rthumb">${p?imgTag(p,"",true):"★"}</span>`;}
+function mealRow([rank,e]){
+  const sub=[e.restaurant,cityOf(e),e.dishType,e.style,fmtDate(e.date)].filter(Boolean).map(esc).join(" · ");
+  return `<button class="rrow" data-open="${esc(e.id)}"><span class="rk${rank<=3?" top":""}">${rank}</span>${thumb((e.photos||[])[0])}
+    <span class="rmain"><b>${esc(e.dish||e.restaurant||"Untitled")}</b><span>${sub}</span></span>
+    <span class="rscore">${starsHTML(e.overall)}<span class="num">${fmtR(e.overall)}</span></span></button>`;
+}
+function restRow([rank,r]){
+  const n=r.meals.length;
+  const sub=[r.city,r.cuisine,`${n} meal${n>1?"s":""}`].filter(Boolean).map(esc).join(" · ");
+  const best=r.best&&r.best.dish?`<span>Best: ${esc(r.best.dish)} (${fmtR(r.best.overall)})</span>`:"";
+  return `<button class="rrow" data-rest="${esc(r.name)}"><span class="rk${rank<=3?" top":""}">${rank}</span>${thumb(r.photo)}
+    <span class="rmain"><b>${esc(r.name)}</b><span>${sub}</span>${best}</span>
+    <span class="rscore">${starsHTML(r.avg)}<span class="num">${r.avg?r.avg.toFixed(2):"–"}</span></span></button>`;
+}
+function renderRankings(list){
+  const isRest=view==="restaurants";
+  const groups=makeGroups(list);
+  $("rankHint").textContent=isRest?"Restaurants ranked by the average of your meal ratings":"Meals ranked by overall rating";
+  $("rankBody").innerHTML=groups.map(([label,items])=>{
+    const ranked=isRest?rankRestaurants(items):rankMeals(items);
+    const head=groupBy?`<h3>${esc(label||"No "+GROUP_LABEL[groupBy]+" set")}<span>${ranked.length} ${isRest?(ranked.length>1?"restaurants":"restaurant"):(ranked.length>1?"meals":"meal")}</span></h3>`:"";
+    return `<div class="rgroup">${head}<div class="rlist">${ranked.map(isRest?restRow:mealRow).join("")}</div></div>`;
+  }).join("");
+}
+function cardHTML(e){
+  const p=(e.photos||[]);
+  return `<button class="card" data-open="${esc(e.id)}">
+    <div class="thumb">${p.length?`${imgTag(p[0],e.dish||e.restaurant,true)}${p.length>1?`<span class="count">+${p.length-1}</span>`:""}`:"No photo"}</div>
+    <div class="body">
+      <h3 class="dish">${esc(e.dish||e.restaurant||"Untitled")}</h3>
+      <div class="where">${esc(e.restaurant||"")}${cityOf(e)?" · "+esc(cityOf(e)):""}</div>
+      <div class="row">${starsHTML(e.overall)}<span class="num">${fmtR(e.overall)}</span></div>
+      <div class="row"><span class="hint">${fmtDate(e.date)}</span><span class="hint">${e.price?PRICE[e.price-1]:""}</span></div>
+      ${(e.dishType||e.cuisine||e.style||e.meal)?`<div class="tags">${[e.dishType,e.cuisine,e.style,e.meal].filter(Boolean).map(t=>`<span class="chip">${esc(t)}</span>`).join("")}</div>`:""}
+    </div></button>`;
+}
+
+/* ---------- sheet ---------- */
+function openSheet(title){ $("sheetTitle").textContent=title; $("sheet").hidden=false; $("scrim").hidden=false; document.body.style.overflow="hidden"; }
+function closeSheet(){ if(draft&&draft.uploading){toast("Wait for photos to finish uploading");return;} if(draft)discardUploads(); $("sheet").hidden=true; $("scrim").hidden=true; document.body.style.overflow=""; draft=null; }
+$("closeSheet").onclick=closeSheet; $("scrim").onclick=closeSheet;
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("sheet").hidden)closeSheet();});
+
+function showDetail(id){
+  const e=entries.find(x=>x.id===id); if(!e)return;
+  draft=null; openSheet(e.dish||e.restaurant||"Meal");
+  const subs=SUBS.filter(([k])=>e.ratings?.[k]);
+  $("sheetBody").innerHTML=`
+    ${(e.photos||[]).length?`<div class="gallery">${e.photos.map(p=>imgTag(p)).join("")}</div>`:""}
+    <div class="where" style="color:var(--muted)">${[e.restaurant,e.area,cityOf(e),e.country].filter(Boolean).map(esc).join(" · ")}</div>
+    <div class="bigscore">${starsHTML(e.overall,"lg")}<b>${fmtR(e.overall)}</b></div>
+    ${subs.length?`<div class="subgrid" style="margin:14px 0">${subs.map(([k,l])=>`<span>${l}</span><span style="display:flex;gap:8px;align-items:center">${starsHTML(e.ratings[k],"md")}<span class="num">${fmtR(e.ratings[k])}</span></span>`).join("")}</div>`:""}
+    <dl class="dl">
+      <dt>Visited</dt><dd>${fmtDate(e.date)||"–"}</dd>
+      ${e.dishType?`<dt>Dish type</dt><dd>${esc(e.dishType)}</dd>`:""}
+      ${e.cuisine?`<dt>Cuisine</dt><dd>${esc(e.cuisine)}</dd>`:""}
+      ${e.style?`<dt>Dining style</dt><dd>${esc(e.style)}</dd>`:""}
+      ${e.meal?`<dt>Meal</dt><dd>${esc(e.meal)}</dd>`:""}
+      ${e.price?`<dt>Price</dt><dd>${PRICE[e.price-1]}${e.cost?` · $${esc(e.cost)} spent`:""}</dd>`:(e.cost?`<dt>Spent</dt><dd>$${esc(e.cost)}</dd>`:"")}
+      ${e.company?`<dt>With</dt><dd>${esc(e.company)}</dd>`:""}
+      ${e.again?`<dt>Go back?</dt><dd>${RET[e.again]}</dd>`:""}
+      ${(e.tags||[]).length?`<dt>Tags</dt><dd style="display:flex;gap:5px;flex-wrap:wrap">${e.tags.map(t=>`<button class="chip" data-tag="${esc(t)}">${esc(t)}</button>`).join("")}</dd>`:""}
+    </dl>
+    ${e.comments?`<p class="comment">${esc(e.comments)}</p>`:""}`;
+  $("sheetFoot").innerHTML=`<button class="btn" id="editBtn">Edit</button><div class="spacer"></div><button class="btn ghost danger" id="delBtn">Delete</button>`;
+  $("editBtn").onclick=()=>showForm(e);
+  $("delBtn").onclick=()=>confirmDelete(e);
+}
+function confirmDelete(e){
+  $("sheetFoot").innerHTML=`<span class="err" style="align-self:center;flex:1">Delete this meal and its photos for good?</span><button class="btn" id="cancelDel">Keep it</button><button class="btn primary" style="background:var(--danger);border-color:var(--danger);color:#fff" id="yesDel">Delete</button>`;
+  $("cancelDel").onclick=()=>showDetail(e.id);
+  $("yesDel").onclick=async()=>{
+    $("yesDel").disabled=true;
+    const {error}=await sb.from("meals").delete().eq("id",e.id);
+    if(error){toast("Couldn't delete: "+error.message);$("yesDel").disabled=false;return;}
+    if((e.photos||[]).length) await sb.storage.from(BUCKET).remove(e.photos);
+    entries=entries.filter(x=>x.id!==e.id);
+    $("sheet").hidden=true; $("scrim").hidden=true; document.body.style.overflow="";
+    render(); toast("Deleted");
+  };
+}
+
+let draft=null;
+function showForm(e){
+  const today=new Date(); const iso=new Date(today.getTime()-today.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+  draft={id:e?.id||null, photos:[...(e?.photos||[])], origPhotos:[...(e?.photos||[])], overall:e?.overall||0, ratings:{...(e?.ratings||{})}, price:e?.price||0, again:e?.again||"", style:e?.style||"", uploading:0, createdAt:e?.createdAt};
+  openSheet(e?"Edit meal":"Log a meal");
+  const dl=(id,vals)=>`<datalist id="${id}">${vals.map(v=>`<option value="${esc(v)}">`).join("")}</datalist>`;
+  $("sheetBody").innerHTML=`<form id="form" novalidate>
+    <fieldset><legend>Photos</legend>
+      <div class="photos" id="photos"></div><span class="hint">Tap to take or choose photos, or drag them in. Up to 8 per meal.</span>
+    </fieldset>
+    <fieldset><legend>The meal</legend>
+      <label class="fl">Restaurant<input id="iRest" required list="dlRest" value="${esc(e?.restaurant)}" placeholder="e.g. Pai Northern Thai"></label>
+      <label class="fl">Dish or order<input id="iDish" value="${esc(e?.dish)}" placeholder="e.g. Khao soi with chicken"></label>
+      <div class="f2">
+        <label class="fl">Date visited<input id="iDate" type="date" value="${esc(e?.date||iso)}"></label>
+        <label class="fl">Meal<select id="iMeal"><option value="">—</option>${MEALS.map(m=>`<option${e?.meal===m?" selected":""}>${m}</option>`).join("")}</select></label>
+        <label class="fl">Dish type<input id="iType" list="dlType" value="${esc(e?.dishType)}" placeholder="e.g. Pasta, Sushi, Burger"></label>
+        <label class="fl">Cuisine<input id="iCuisine" list="dlCuisine" value="${esc(e?.cuisine)}" placeholder="e.g. Italian, Thai"></label>
+        <label class="fl">City<input id="iCity" list="dlCity" value="${esc(cityOf(e||{}))}" placeholder="e.g. Toronto"></label>
+        <label class="fl">Country<input id="iCountry" list="dlCountry" value="${esc(e?.country)}" placeholder="e.g. Canada"></label>
+        <label class="fl">Amount spent ($)<input id="iCost" inputmode="decimal" value="${esc(e?.cost)}" placeholder="optional"></label>
+        <label class="fl">Who you went with<input id="iWith" value="${esc(e?.company)}" placeholder="optional"></label>
+      </div>
+      <label class="fl">Neighbourhood or address<input id="iArea" value="${esc(e?.area)}" placeholder="optional, e.g. Ossington"></label>
+      ${dl("dlRest",uniq("restaurant"))}${dl("dlCuisine",uniq("cuisine"))}${dl("dlCity",uniq("city"))}
+      ${dl("dlType",[...new Set([...uniq("dishType"),...DISH_TYPES])])}${dl("dlCountry",[...new Set([...uniq("country"),...COUNTRIES])])}
+    </fieldset>
+    <fieldset><legend>Overall rating</legend><div id="pOverall"></div></fieldset>
+    <fieldset><legend>Rate it on</legend><div class="subgrid" id="pSubs"></div><span class="hint">Optional. Skip any that don't apply.</span></fieldset>
+    <fieldset><legend>Price level</legend><div class="seg" id="segPrice">${PRICE.map((p,i)=>`<button type="button" data-v="${i+1}">${p}</button>`).join("")}</div></fieldset>
+    <fieldset><legend>Dining style</legend><div class="seg" id="segStyle">${STYLES.map(x=>`<button type="button" data-v="${x}">${x}</button>`).join("")}</div></fieldset>
+    <fieldset><legend>Would you go back?</legend><div class="seg" id="segAgain">${Object.entries(RET).map(([k,v])=>`<button type="button" data-v="${k}">${v}</button>`).join("")}</div></fieldset>
+    <fieldset><legend>Notes</legend>
+      <label class="fl">Comments<textarea id="iComments" placeholder="What stood out, what you'd order next time…">${esc(e?.comments)}</textarea></label>
+      <label class="fl">Tags<input id="iTags" value="${esc((e?.tags||[]).join(", "))}" placeholder="spicy, date night, patio (comma separated)"></label>
+    </fieldset>
+    <p class="err" id="formErr" hidden></p>
+  </form>`;
+  $("sheetFoot").innerHTML=`<button class="btn" id="cancelForm">Cancel</button><div class="spacer"></div><button class="btn primary" id="saveBtn">${e?"Save changes":"Save meal"}</button>`;
+  $("cancelForm").onclick=()=>{ if(draft&&draft.uploading){toast("Wait for photos to finish uploading");return;} discardUploads(); draft=null; e?showDetail(e.id):closeSheet(); };
+  $("saveBtn").onclick=save;
+  $("form").onsubmit=ev=>{ev.preventDefault();save();};
+  mountPicker($("pOverall"),()=>draft.overall,v=>draft.overall=v,false);
+  $("pSubs").innerHTML=SUBS.map(([k,l])=>`<span>${l}</span><div data-sub="${k}"></div>`).join("");
+  SUBS.forEach(([k])=>mountPicker($("pSubs").querySelector(`[data-sub="${k}"]`),()=>draft.ratings[k]||0,v=>{if(v)draft.ratings[k]=v;else delete draft.ratings[k];},true));
+  setupSeg("segPrice",()=>String(draft.price||""),v=>draft.price=draft.price===+v?0:+v);
+  setupSeg("segStyle",()=>draft.style,v=>draft.style=draft.style===v?"":v);
+  setupSeg("segAgain",()=>draft.again,v=>draft.again=draft.again===v?"":v);
+  renderPhotos();
+}
+function setupSeg(id,get,set){const el=$(id);const paint=()=>el.querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v===get())));el.onclick=ev=>{const b=ev.target.closest("button");if(!b)return;set(b.dataset.v);paint();};paint();}
+function mountPicker(host,get,set,small){
+  host.className="picker"+(small?" small":"");
+  const paint=()=>{
+    const v=get();
+    host.innerHTML=`<span class="stars">${[1,2,3,4,5].map(i=>{const f=Math.max(0,Math.min(1,v-(i-1)));return `<span class="st">★<span class="fill" style="width:${f*100}%">★</span><button type="button" class="half l" data-v="${i-.5}" aria-label="${i-.5} stars"></button><button type="button" class="half r" data-v="${i}" aria-label="${i} star${i>1?"s":""}"></button></span>`;}).join("")}</span><span class="val">${v?v.toFixed(1):"—"}</span>${v?`<button type="button" class="clear">Clear</button>`:""}`;
+  };
+  host.onclick=ev=>{
+    if(ev.target.closest(".clear")){set(0);paint();return;}
+    const b=ev.target.closest(".half");if(!b)return;
+    const v=+b.dataset.v; set(get()===v?0:v); paint();
+    const nb=host.querySelector(`.half[data-v="${v}"]`); nb&&nb.focus();
+  };
+  paint();
+}
+
+/* photos */
+const pending=new Map(); let pid=0;
+function renderPhotos(){
+  const el=$("photos"); if(!el||!draft)return;
+  el.innerHTML=draft.photos.map((p,i)=>`<div class="ph">${imgTag(p)}<button type="button" class="rm" data-rm="${i}" aria-label="Remove photo">×</button></div>`).join("")
+    +[...pending.values()].map(()=>`<div class="ph busy">Uploading…</div>`).join("")
+    +(draft.photos.length+pending.size<8?`<div class="drop" id="drop" tabindex="0" role="button">+ Add photos</div>`:"");
+  el.onclick=ev=>{const r=ev.target.closest("[data-rm]");if(r){draft.photos.splice(+r.dataset.rm,1);renderPhotos();return;} if(ev.target.closest("#drop"))$("fileIn").click();};
+  const d=$("drop"); if(d){
+    d.onkeydown=ev=>{if(ev.key==="Enter"||ev.key===" "){ev.preventDefault();$("fileIn").click();}};
+    d.ondragover=ev=>{ev.preventDefault();d.classList.add("over");};
+    d.ondragleave=()=>d.classList.remove("over");
+    d.ondrop=ev=>{ev.preventDefault();d.classList.remove("over");addFiles(ev.dataTransfer.files);};
+  }
+}
+$("fileIn").onchange=ev=>{addFiles(ev.target.files);ev.target.value="";};
+const isHeic=f=>/heic|heif/i.test(f.type)||/\.(heic|heif)$/i.test(f.name||"");
+async function shrink(file){
+  try{
+    let bmp;
+    try{ bmp=await createImageBitmap(file); }
+    catch(err){ if(!isHeic(file)) throw err; bmp=await createImageBitmap(await toJpeg(file)); }
+    const max=1800, sc=Math.min(1,max/Math.max(bmp.width,bmp.height));
+    const c=document.createElement("canvas"); c.width=Math.round(bmp.width*sc); c.height=Math.round(bmp.height*sc);
+    c.getContext("2d").drawImage(bmp,0,0,c.width,c.height);
+    const b=await new Promise(r=>c.toBlob(r,"image/jpeg",.85)); return b||file;
+  }catch(e){ if(isHeic(file)) throw new Error("couldn't convert this HEIC photo. Try exporting it as JPEG"); return file; }
+}
+const newId=()=>(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
+async function addFiles(files){
+  if(!draft)return; const d=draft;
+  for(const f of [...files].filter(f=>f.type.startsWith("image/")||/\.(heic|heif)$/i.test(f.name)).slice(0,8-d.photos.length-pending.size)){
+    const k=++pid; pending.set(k,1); d.uploading++; renderPhotos();
+    try{
+      const blob=await shrink(f);
+      const path=`${uid}/${newId()}.jpg`;
+      const {error}=await sb.storage.from(BUCKET).upload(path,blob,{contentType:blob.type||"image/jpeg",upsert:false});
+      if(error) throw error;
+      await signPhotos([path]);
+      d.photos.push(path);
+    }catch(err){ toast("Photo upload failed: "+(err.message||"try a JPG or PNG")); }
+    finally{pending.delete(k); d.uploading--; if(draft===d)renderPhotos();}
+  }
+}
+function discardUploads(){
+  if(!draft)return;
+  const extra=draft.photos.filter(p=>!draft.origPhotos.includes(p));
+  if(extra.length) sb.storage.from(BUCKET).remove(extra);
+}
+
+async function save(){
+  if(draft.uploading){toast("Wait for photos to finish uploading");return;}
+  const rest=$("iRest").value.trim(), err=$("formErr");
+  if(!rest){err.textContent="Add the restaurant name so you can find and filter this meal later.";err.hidden=false;$("iRest").focus();return;}
+  if(!draft.overall){err.textContent="Give it an overall star rating.";err.hidden=false;$("pOverall").scrollIntoView({block:"center"});return;}
+  err.hidden=true;
+  const data={
+    restaurant:rest, dish:$("iDish").value.trim(), date:$("iDate").value, meal:$("iMeal").value,
+    dishType:$("iType").value.trim(), cuisine:$("iCuisine").value.trim(), city:$("iCity").value.trim(), country:$("iCountry").value.trim(), area:$("iArea").value.trim(), cost:$("iCost").value.trim().replace(/^\$/,""),
+    company:$("iWith").value.trim(), overall:draft.overall, ratings:draft.ratings, price:draft.price, again:draft.again, style:draft.style,
+    comments:$("iComments").value.trim(), tags:$("iTags").value.split(",").map(t=>t.trim()).filter(Boolean),
+    photos:draft.photos, createdAt:draft.createdAt||Date.now(), updatedAt:Date.now()
+  };
+  $("saveBtn").disabled=true;
+  let id=draft.id, res;
+  if(id) res=await sb.from("meals").update({data}).eq("id",id).select("id").single();
+  else   res=await sb.from("meals").insert({data}).select("id").single();
+  if(res.error){err.textContent="Couldn't save: "+res.error.message;err.hidden=false;$("saveBtn").disabled=false;return;}
+  id=res.data.id;
+  const removed=draft.origPhotos.filter(p=>!data.photos.includes(p));
+  if(removed.length) sb.storage.from(BUCKET).remove(removed);
+  const i=entries.findIndex(x=>x.id===id);
+  if(i>=0) entries[i]={...data,id}; else entries.unshift({...data,id});
+  draft=null; render(); toast("Saved"); showDetail(id);
+}
+
+/* export */
+function exportCSV(){
+  const cols=["date","restaurant","dish","dishType","cuisine","style","meal","city","country","area","overall",...SUBS.map(s=>s[0]),"price","cost","company","again","tags","comments","photo_count"];
+  const cell=v=>{v=v==null?"":String(v);return /[",\n]/.test(v)?`"${v.replace(/"/g,'""')}"`:v;};
+  const rows=entries.slice().sort((a,b)=>(a.date||"").localeCompare(b.date||"")).map(e=>cols.map(c=>{
+    if(SUBS.some(s=>s[0]===c))return e.ratings?.[c]||"";
+    if(c==="city")return cityOf(e);
+    if(c==="price")return e.price?PRICE[e.price-1]:"";
+    if(c==="again")return RET[e.again]||"";
+    if(c==="tags")return (e.tags||[]).join("; ");
+    if(c==="photo_count")return (e.photos||[]).length;
+    return e[c]??"";
+  }).map(cell).join(","));
+  const blob=new Blob([[cols.join(","),...rows].join("\n")],{type:"text/csv"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download=`plate-log-${new Date().toISOString().slice(0,10)}.csv`; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+
+/* wiring */
+$("addBtn").onclick=()=>showForm(null);
+$("grid").onclick=ev=>{const c=ev.target.closest("[data-open]");if(c)showDetail(c.dataset.open);};
+$("sheetBody").addEventListener("click",ev=>{const t=ev.target.closest("[data-tag]");if(t){filt.tag=t.dataset.tag;closeSheet();render();}});
+$("chips").onclick=ev=>{const c=ev.target.closest("[data-clear]");if(!c)return;const k=c.dataset.clear;filt[k]=k==="min"?0:"";if(k==="q")$("q").value="";render();};
+let qt;$("q").oninput=ev=>{clearTimeout(qt);qt=setTimeout(()=>{filt.q=ev.target.value.trim();render();},150);};
+$("fCuisine").onchange=e=>{filt.cuisine=e.target.value;render();};
+$("fType").onchange=e=>{filt.type=e.target.value;render();};
+$("fCity").onchange=e=>{filt.city=e.target.value;render();};
+$("fCountry").onchange=e=>{filt.country=e.target.value;render();};
+$("views").onclick=ev=>{const b=ev.target.closest("button");if(!b)return;view=b.dataset.v;savePrefs();render();};
+$("groupBy").onchange=e=>{groupBy=e.target.value;savePrefs();render();};
+$("fToggle").onclick=()=>{const f=$("filters");const open=f.classList.toggle("collapsed")===false;$("fToggle").setAttribute("aria-expanded",String(open));};
+$("rankBody").onclick=ev=>{
+  const m=ev.target.closest("[data-open]"); if(m){showDetail(m.dataset.open);return;}
+  const r=ev.target.closest("[data-rest]"); if(r){filt.rest=r.dataset.rest;view="meals";groupBy="";savePrefs();render();window.scrollTo({top:0,behavior:"smooth"});}
+};
+$("fRest").onchange=e=>{filt.rest=e.target.value;render();};
+$("fStyle").onchange=e=>{filt.style=e.target.value;render();};
+$("fMeal").onchange=e=>{filt.meal=e.target.value;render();};
+$("fPrice").onchange=e=>{filt.price=e.target.value;render();};
+$("fMin").onchange=e=>{filt.min=+e.target.value;render();};
+$("sort").onchange=e=>{filt.sort=e.target.value;savePrefs();render();};
+const menuBtn=$("menuBtn"),menuPop=$("menuPop");
+menuBtn.onclick=ev=>{ev.stopPropagation();menuPop.hidden=!menuPop.hidden;menuBtn.setAttribute("aria-expanded",String(!menuPop.hidden));};
+document.addEventListener("click",ev=>{if(!menuPop.hidden&&!ev.target.closest(".menu")){menuPop.hidden=true;menuBtn.setAttribute("aria-expanded","false");}});
+$("exportBtn").onclick=()=>{menuPop.hidden=true;exportCSV();};
+$("signOutBtn").onclick=async()=>{menuPop.hidden=true;await sb.auth.signOut();};
+
+boot();
+})();
+</script>
+</body>
+</html>
